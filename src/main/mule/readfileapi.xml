@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:workday="http://www.mulesoft.org/schema/mule/workday"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/workday http://www.mulesoft.org/schema/mule/workday/current/mule-workday.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="691e81ae-a699-480c-ae52-243231cd10ea" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="root" database="db" />
+	</db:config>
+	<flow name="readfileapiFlow" doc:id="e67a48a3-8cbb-465a-ae3e-4643d8df9e72" >
+		<http:listener doc:name="Listener" doc:id="0ea50b1c-df19-495f-b167-5c18c9df6853" config-ref="HTTP_Listener_config" path="${http.path}"/>
+		<set-variable value="#[uuid()]" doc:name="transactionId" doc:id="d386edb7-5685-499e-a370-562ba3fab851" variableName="transactionId"/>
+		<logger level="INFO" doc:name="start of the readfileapiFlow" doc:id="ee6fe2d9-f458-4223-9c86-50a713a244c7" message="start of the readfileapiFlow transactionId #[vars.transactionId]"/>
+		<file:list doc:name="List all the files" doc:id="eaa471bc-2baf-49d2-b1a1-b4fa7a747296" config-ref="File_Config" directoryPath="C:\Users\santo\newfolder" recursive="true">
+			<file:matcher directories="EXCLUDE" regularFiles="REQUIRE" />
+		</file:list>
+		<set-variable value="#[p('directory.path')]" doc:name="directoryPath" doc:id="6bdd066f-3642-4e8e-bf66-98ab471c35c7" variableName="directoryPath"/>
+		<set-variable value="#[payload[0].attributes.path]" doc:name="Set Variable" doc:id="b1ac580d-1db0-4710-8be5-37e490d6b887" variableName="filePath" />
+		<choice doc:name="Choice" doc:id="a0e2fb70-ce2d-456b-bef2-1161a4a7654b" >
+			<when expression="#[sizeOf(payload)&gt;0]">
+				<set-variable value="#[payload[0].attributes.fileName]" doc:name="fileName" doc:id="f527be0c-d6ff-4c25-8555-1df1cd3149ff" variableName="fileName" />
+				<file:read doc:name="Read file" doc:id="624dcc07-346c-482a-9b08-5dec7020ba32" config-ref="File_Config" path='#["/Users/santo/newfolder" ++ "/" ++ vars.fileName]' />
+				<ee:transform doc:name="Transform Message" doc:id="9729e2d7-2321-49b1-b912-a361ae8860a0">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map
+{
+	empid:$.employeeid,
+	empname:$.employeename,
+	role:$.employeerole,
+	phone:$.phonenumber,
+	designation:$.designation
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="081ba6b7-05b8-4740-932e-e93516898ecf" message="File not found"/>
+				<ee:transform doc:name="Transform Message" doc:id="c4133e4d-8b2e-4916-8fa1-fe208117028b" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"file not found"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<db:bulk-insert doc:name="Bulk insert" doc:id="000d8d84-83dc-4824-8151-bbe5372b1061" config-ref="Database_Config">
+			<db:sql ><![CDATA[INSERT INTO employeeMol(empid,empname,role,phone,designation)
+    VALUES (:empid, :empname, :role,:phone, :designation)]]></db:sql>
+		</db:bulk-insert>
+		<file:move doc:name="Move" doc:id="b773336e-4412-4e7a-858a-7f94f144734f" config-ref="File_Config" sourcePath="#[vars.filePath]" targetPath='#[vars.directoryPath ++ "/" ++ "archive"]' />
+		<!-- [STUDIO:"Transform Message"]<ee:transform doc:name="Transform Message" doc:id="543385bf-7b7f-48be-95bd-872a58c5303c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+&#45;&#45;-
+payload&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform> [STUDIO] -->
+		<!-- [STUDIO:"Write"]<file:write doc:name="Write" doc:id="de0eb8c3-d55e-4722-8ec8-cfcd4aac3359" config-ref="File_Config" path='#["/users/santo/write/backup" ++ ".csv"&#93;'/> [STUDIO] -->
+		<logger level="INFO" doc:name="Logger" doc:id="91eaeab4-a881-4ab2-9ca5-609e746f3ac2" message="end of the file transactionId #[vars.transactionId]"/>
+	</flow>
+	<flow name="readfileapiFlow1" doc:id="fb9a5a8b-a08a-42cf-840f-abf5918ce2b8" >
+		<file:listener doc:name="On New or Updated File" doc:id="63e80d06-6fce-49ee-9973-d78ead736f1f" config-ref="File_Config" directory="/users/santo/write">
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</file:listener>
+		<ee:transform doc:name="Transform Message" doc:id="25d6d66d-fe9a-46c4-9d27-347bd6cbf691" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="0ec774d1-6751-4fff-8fcf-30de51ece1e5" message="end of the flow"/>
+	</flow>
+</mule>
