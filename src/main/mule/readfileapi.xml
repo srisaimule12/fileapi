@@ -57,16 +57,16 @@ output application/json
     VALUES (:empid, :empname, :role,:phone, :designation)]]></db:sql>
 		</db:bulk-insert>
 		<file:move doc:name="Move" doc:id="b773336e-4412-4e7a-858a-7f94f144734f" config-ref="File_Config" sourcePath="#[vars.filePath]" targetPath='#[vars.directoryPath ++ "/" ++ "archive"]' />
-		<!-- [STUDIO:"Transform Message"]<ee:transform doc:name="Transform Message" doc:id="543385bf-7b7f-48be-95bd-872a58c5303c" >
+		<ee:transform doc:name="Transform Message" doc:id="543385bf-7b7f-48be-95bd-872a58c5303c" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/csv
-&#45;&#45;-
-payload&#93;&#93;></ee:set-payload>
+---
+payload]]></ee:set-payload>
 			</ee:message>
-		</ee:transform> [STUDIO] -->
-		<!-- [STUDIO:"Write"]<file:write doc:name="Write" doc:id="de0eb8c3-d55e-4722-8ec8-cfcd4aac3359" config-ref="File_Config" path='#["/users/santo/write/backup" ++ ".csv"&#93;'/> [STUDIO] -->
-		<logger level="INFO" doc:name="Logger" doc:id="91eaeab4-a881-4ab2-9ca5-609e746f3ac2" message="end of the file transactionId #[vars.transactionId]"/>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="91eaeab4-a881-4ab2-9ca5-609e746f3ac2" message="end of the file transactionId #[vars.transactionId]" />
+		<file:write doc:name="Write" doc:id="de0eb8c3-d55e-4722-8ec8-cfcd4aac3359" config-ref="File_Config" path='#["/users/santo/write/backup" ++ ".csv"]'/>
 	</flow>
 	<flow name="readfileapiFlow1" doc:id="fb9a5a8b-a08a-42cf-840f-abf5918ce2b8" >
 		<file:listener doc:name="On New or Updated File" doc:id="63e80d06-6fce-49ee-9973-d78ead736f1f" config-ref="File_Config" directory="/users/santo/write">
